@@ -26,8 +26,10 @@ export const ShopView: React.FC = () => {
     { id: 'men', label: "Men's Fashion" },
     { id: 'women', label: "Women's Fashion" },
     { id: 'kids', label: "Kids' Fashion" },
-    { id: 'peshawari', label: 'Peshawari Chappal' },
-    { id: 'footwear', label: 'Footwear & Loafers' },
+    { id: 'shirts', label: 'Shirts' },
+    { id: 'pants', label: 'Pants' },
+    { id: 'shoes', label: 'Shoes' },
+    { id: 'peshawari', label: 'Peshawari Chapals' },
   ];
 
   const filteredProducts = useMemo(() => {
@@ -36,6 +38,12 @@ export const ShopView: React.FC = () => {
       if (selectedCategory !== 'all') {
         if (selectedCategory === 'peshawari') {
           if (p.category !== 'peshawari' && p.subcategory !== 'peshawari') return false;
+        } else if (selectedCategory === 'shirts') {
+          if (p.subcategory !== 'shirts' && p.category !== 'shirts') return false;
+        } else if (selectedCategory === 'pants') {
+          if (p.subcategory !== 'pants' && p.category !== 'pants') return false;
+        } else if (selectedCategory === 'shoes' || selectedCategory === 'footwear') {
+          if (p.category !== 'footwear' && p.subcategory !== 'footwear' && p.category !== 'shoes' && p.subcategory !== 'shoes') return false;
         } else if (p.category !== selectedCategory) {
           return false;
         }

@@ -2,7 +2,15 @@
  * GROCARY SHELF — E-commerce & WordPress Types
  */
 
-export type MainCategory = 'men' | 'women' | 'kids' | 'footwear' | 'peshawari';
+export type MainCategory = 
+  | 'men' 
+  | 'women' 
+  | 'kids' 
+  | 'footwear' 
+  | 'peshawari'
+  | 'shirts'
+  | 'pants'
+  | 'shoes';
 
 export type SubCategory = 
   | 'shirts' 
@@ -13,7 +21,21 @@ export type SubCategory =
   | 'peshawari' 
   | 'girls' 
   | 'boys' 
-  | 'traditional';
+  | 'traditional'
+  | 'shoes';
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string;
+  role: 'admin' | 'superadmin';
+}
+
+export interface AdminAuthState {
+  isAuthenticated: boolean;
+  user: AdminUser | null;
+  token: string | null;
+}
 
 export interface ProductColor {
   name: string;

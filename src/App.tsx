@@ -17,6 +17,7 @@ import { OrderConfirmationModal } from './components/OrderConfirmationModal';
 import { QuickViewModal } from './components/QuickViewModal';
 import { SizeGuideModal } from './components/SizeGuideModal';
 import { ElementorToolkitModal } from './components/ElementorToolkitModal';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { MessageCircle, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -70,6 +71,7 @@ const MainLayout: React.FC = () => {
       <QuickViewModal />
       <SizeGuideModal />
       <ElementorToolkitModal />
+      <AdminDashboardModal />
     </div>
   );
 };

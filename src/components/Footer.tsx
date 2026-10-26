@@ -3,12 +3,12 @@
  */
 
 import React from 'react';
-import { Phone, Mail, MapPin, MessageCircle, ShieldCheck, Truck, Code2 } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle, ShieldCheck, Truck, Code2, Lock } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { MainCategory } from '../types';
 
 export const Footer: React.FC = () => {
-  const { setActiveTab, setSelectedCategory, setIsToolkitOpen } = useStore();
+  const { setActiveTab, setSelectedCategory, setIsToolkitOpen, setIsAdminModalOpen, adminAuth } = useStore();
 
   const handleCategoryClick = (cat: MainCategory) => {
     setSelectedCategory(cat);
@@ -174,7 +174,14 @@ export const Footer: React.FC = () => {
                   km2945002@gmail.com
                 </a>
               </li>
-              <li className="pt-2">
+              <li className="pt-2 space-y-2">
+                <button
+                  onClick={() => setIsAdminModalOpen(true)}
+                  className="w-full py-2 px-3 bg-[#075C3B]/80 hover:bg-[#075C3B] text-white rounded text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors border border-[#075C3B]"
+                >
+                  <Lock className="w-3.5 h-3.5 text-[#C5A059]" />
+                  <span>{adminAuth.isAuthenticated ? 'Admin Dashboard (Active)' : 'Admin Portal & Add Products'}</span>
+                </button>
                 <button
                   onClick={() => setIsToolkitOpen(true)}
                   className="w-full py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"

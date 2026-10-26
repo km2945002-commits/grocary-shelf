@@ -1,13 +1,27 @@
 /**
- * GROCARY SHELF — Store State Context
+ * GROCARY SHELF — Store State Context with Admin Auth & Persistent Database Sync
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, CartItem, Order, ProductColor, MainCategory } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Product, CartItem, Order, ProductColor, MainCategory, AdminUser, AdminAuthState } from '../types';
 import { PRODUCTS } from '../data/products';
 
 interface StoreContextType {
   products: Product[];
+  isLoadingProducts: boolean;
+  refreshProducts: () => Promise<void>;
+  addProduct: (productData: Partial<Product>) => Promise<{ success: boolean; product?: Product; message?: string }>;
+  updateProduct: (id: string, productData: Partial<Product>) => Promise<{ success: boolean; product?: Product; message?: string }>;
+  deleteProduct: (id: string) => Promise<{ success: boolean; message?: string }>;
+
+  // Admin Auth
+  adminAuth: AdminAuthState;
+  adminLogin: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  adminLogout: () => void;
+  isAdminModalOpen: boolean;
+  setIsAdminModalOpen: (isOpen: boolean) => void;
+
+  // Cart & Commerce
   cart: CartItem[];
   addToCart: (product: Product, size: string, color: ProductColor, quantity?: number) => void;
   updateCartQuantity: (cartItemId: string, quantity: number) => void;
@@ -68,8 +82,218 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [products] = useState<Product[]>(PRODUCTS);
-  
+  // Products state (seeded initially from static, then synced with server database)
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem('gs_products_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return PRODUCTS;
+  });
+
+  const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(false);
+
+  // Admin Authentication State
+  const [adminAuth, setAdminAuth] = useState<AdminAuthState>(() => {
+    try {
+      const token = localStorage.getItem('gs_admin_token');
+      const userStr = localStorage.getItem('gs_admin_user');
+      if (token && userStr) {
+        return {
+          isAuthenticated: true,
+          token,
+          user: JSON.parse(userStr)
+        };
+      }
+    } catch {}
+    return {
+      isAuthenticated: false,
+      token: null,
+      user: null
+    };
+  });
+
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  }, []);
+
+  // Fetch products from server database
+  const refreshProducts = useCallback(async () => {
+    try {
+      setIsLoadingProducts(true);
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(data.products);
+          localStorage.setItem('gs_products_cache', JSON.stringify(data.products));
+        }
+      }
+    } catch (err) {
+      console.warn('API /api/products unavailable, using cached catalog:', err);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshProducts();
+  }, [refreshProducts]);
+
+  // Admin Login
+  const adminLogin = async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.token) {
+        const authData: AdminAuthState = {
+          isAuthenticated: true,
+          token: data.token,
+          user: data.user
+        };
+        setAdminAuth(authData);
+        localStorage.setItem('gs_admin_token', data.token);
+        localStorage.setItem('gs_admin_user', JSON.stringify(data.user));
+        showToast(`Welcome back, ${data.user.username}!`, 'success');
+        return { success: true };
+      } else {
+        const msg = data.message || 'Invalid username or password.';
+        showToast(msg, 'error');
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Login request failed.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+  };
+
+  // Admin Logout
+  const adminLogout = () => {
+    setAdminAuth({ isAuthenticated: false, token: null, user: null });
+    localStorage.removeItem('gs_admin_token');
+    localStorage.removeItem('gs_admin_user');
+    showToast('Logged out of Admin Portal.', 'info');
+  };
+
+  // Add Product (Server Persisted)
+  const addProduct = async (productData: Partial<Product>): Promise<{ success: boolean; product?: Product; message?: string }> => {
+    if (!adminAuth.token) {
+      showToast('Admin authorization required.', 'error');
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminAuth.token}`
+        },
+        body: JSON.stringify(productData)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.product) {
+        setProducts(prev => [data.product, ...prev]);
+        localStorage.setItem('gs_products_cache', JSON.stringify([data.product, ...products]));
+        showToast(`Product "${data.product.name}" added successfully!`, 'success');
+        return { success: true, product: data.product };
+      } else {
+        const msg = data.message || 'Failed to create product.';
+        showToast(msg, 'error');
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Network error while adding product.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+  };
+
+  // Update Product (Server Persisted)
+  const updateProduct = async (id: string, productData: Partial<Product>): Promise<{ success: boolean; product?: Product; message?: string }> => {
+    if (!adminAuth.token) {
+      showToast('Admin authorization required.', 'error');
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminAuth.token}`
+        },
+        body: JSON.stringify(productData)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.product) {
+        setProducts(prev => prev.map(p => p.id === id ? data.product : p));
+        showToast(`Product "${data.product.name}" updated successfully!`, 'success');
+        return { success: true, product: data.product };
+      } else {
+        const msg = data.message || 'Failed to update product.';
+        showToast(msg, 'error');
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Network error while updating product.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+  };
+
+  // Delete Product (Server Persisted)
+  const deleteProduct = async (id: string): Promise<{ success: boolean; message?: string }> => {
+    if (!adminAuth.token) {
+      showToast('Admin authorization required.', 'error');
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminAuth.token}`
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setProducts(prev => prev.filter(p => p.id !== id));
+        showToast('Product deleted from database.', 'info');
+        return { success: true };
+      } else {
+        const msg = data.message || 'Failed to delete product.';
+        showToast(msg, 'error');
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Network error while deleting product.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+  };
+
   // Persisted cart
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -95,7 +319,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const saved = localStorage.getItem('gs_orders');
       if (saved) return JSON.parse(saved);
-      // Sample realistic initial confirmed order for demo tracking
       return [
         {
           id: 'ord-sample-1',
@@ -152,8 +375,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isOrderConfirmOpen, setIsOrderConfirmOpen] = useState(false);
   const [isToolkitOpen, setIsToolkitOpen] = useState(false);
 
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-
   // Sync to local storage
   useEffect(() => {
     try {
@@ -178,13 +399,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error(e);
     }
   }, [orders]);
-
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => {
-      setToast(null);
-    }, 3500);
-  };
 
   const formatPKR = (amount: number): string => {
     return `Rs. ${amount.toLocaleString('en-PK')}`;
@@ -343,6 +557,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <StoreContext.Provider
       value={{
         products,
+        isLoadingProducts,
+        refreshProducts,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        adminAuth,
+        adminLogin,
+        adminLogout,
+        isAdminModalOpen,
+        setIsAdminModalOpen,
         cart,
         addToCart,
         updateCartQuantity,

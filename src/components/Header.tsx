@@ -13,7 +13,8 @@ import {
   Truck, 
   Code2, 
   FileText,
-  ChevronRight
+  ChevronRight,
+  Lock
 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import { MainCategory } from '../types';
@@ -31,6 +32,9 @@ export const Header: React.FC = () => {
     products,
     openQuickView,
     setIsToolkitOpen,
+    isAdminModalOpen,
+    setIsAdminModalOpen,
+    adminAuth,
     formatPKR
   } = useStore();
 
@@ -208,6 +212,20 @@ export const Header: React.FC = () => {
 
           {/* Action Tools & Buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Admin Dashboard Portal Trigger */}
+            <button
+              onClick={() => setIsAdminModalOpen(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border transition-all shadow-2xs ${
+                adminAuth.isAuthenticated
+                  ? 'bg-emerald-100 text-[#075C3B] border-emerald-300 font-bold'
+                  : 'bg-white hover:bg-neutral-100 text-neutral-700 border-neutral-300'
+              }`}
+              title="Admin Dashboard (Manage Products, Inventory, Database)"
+            >
+              <Lock className="w-3.5 h-3.5 text-[#075C3B]" />
+              <span>Admin</span>
+            </button>
+
             {/* WordPress / Elementor Developer Suite Shortcut */}
             <button
               onClick={() => setIsToolkitOpen(true)}
@@ -416,6 +434,16 @@ export const Header: React.FC = () => {
               >
                 <FileText className="w-4 h-4 text-[#075C3B]" />
                 <span>Track Your COD Order</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsAdminModalOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-left px-3 py-2 rounded bg-emerald-50 text-[#075C3B] font-bold flex items-center gap-2 border border-emerald-200"
+              >
+                <Lock className="w-4 h-4 text-[#075C3B]" />
+                <span>Admin Dashboard &amp; Product Manager</span>
               </button>
               <button
                 onClick={() => {
